@@ -1,97 +1,61 @@
-# Network Infrastructure Report
+# Network Report
 
-## Table of Contents
-- [Firewalls](#firewalls)
-- [Load Balancers](#load-balancers)
-- [Routers](#routers)
-- [Other Devices](#other-devices)
+## Firewalls and Routers
 
----
+### RouterFW1
+- Interface IP/Subnets: 192.168.1.1/24
+- OSPF Process: 1, Area: 0
+- Passive Interfaces: GigabitEthernet0/0
+- Default Information Originate: Always
 
-## Firewalls
+### RouterFW2
+- Interface IP/Subnets: 192.168.2.1/24
+- OSPF Process: 1, Area: 0
+- Passive Interfaces: GigabitEthernet0/0
+- Default Information Originate: Always
 
-| Name | IP Address | Model | Firmware Version | Location | Rules/Policies | Status | Notes |
-|------|------------|-------|-----------------|----------|----------------|--------|-------|
-|      |            |       |                 |          |                |        |       |
+### RouterFW3
+- Interface IP/Subnets: 192.168.3.1/24
+- OSPF Process: 1, Area: 0
+- VLAN Subinterfaces: 10 (192.168.10.1/24), 20 (192.168.20.1/24)
 
-### Firewall Configuration Details
+### RouterFW4
+- Interface IP/Subnets: 192.168.4.1/24
+- OSPF Process: 1, Area: 0
+- VLAN Subinterfaces: 10 (192.168.10.2/24), 20 (192.168.20.2/24)
 
-#### \<Firewall Name\>
-- **IP Address:**
-- **Model:**
-- **Firmware Version:**
-- **Location:**
-- **Inbound Rules:**
-- **Outbound Rules:**
-- **NAT Rules:**
-- **VPN Configuration:**
-- **Notes:**
+### RouterFW5
+- Interface IP/Subnets: 192.168.5.1/24
+- OSPF Process: 1, Area: 0
+- Passive Interfaces: GigabitEthernet0/0
 
----
+### RouterFW6
+- Interface IP/Subnets: 192.168.6.1/24
+- OSPF Process: 1, Area: 0
+- Passive Interfaces: GigabitEthernet0/0
 
-## Load Balancers
+### RouterC1
+- Interface IP/Subnets: 192.168.7.1/24
+- OSPF Process: 1, Area: 0
 
-| Name | IP Address | Model | Firmware Version | Algorithm | Backend Pool | Status | Notes |
-|------|------------|-------|-----------------|-----------|--------------|--------|-------|
-|      |            |       |                 |           |              |        |       |
+### RouterC2
+- Interface IP/Subnets: 192.168.8.1/24
+- OSPF Process: 1, Area: 0
 
-### Load Balancer Configuration Details
+## PC Addressing
+- PC addresses and Default Gateways:
+  - PC1: 10.1.0.10/24 (Gateway: 10.1.0.1)
+  - PC2: 10.10.0.10/24 (Gateway: 10.10.0.1)
+  - PC3: 10.20.0.10/24 (Gateway: 10.20.0.1)
 
-#### \<Load Balancer Name\>
-- **IP Address:**
-- **Model:**
-- **Firmware Version:**
-- **Algorithm:** *(e.g., Round Robin, Least Connections, IP Hash)*
-- **Health Check:**
-- **Backend Servers:**
-- **Persistence/Session Configuration:**
-- **SSL/TLS Configuration:**
-- **Notes:**
+## L2 Switch VLANs
+- VLANs: 1, 10, 20
+- Trunk Ports: FW3 - GigabitEthernet0/1, FW4 - GigabitEthernet0/2
 
----
-
-## Routers
-
-| Name | IP Address | Model | Firmware Version | Location | Routing Protocol | Status | Notes |
-|------|------------|-------|-----------------|----------|-----------------|--------|-------|
-|      |            |       |                 |          |                 |        |       |
-
-### Router Configuration Details
-
-#### \<Router Name\>
-- **IP Address:**
-- **Model:**
-- **Firmware Version:**
-- **Location:**
-- **Routing Protocol:** *(e.g., OSPF, BGP, EIGRP, Static)*
-- **Interfaces:**
-- **VLANs:**
-- **ACLs:**
-- **Notes:**
-
----
-
-## Other Devices
-
-| Name | Type | IP Address | Model | Firmware Version | Location | Status | Notes |
-|------|------|------------|-------|-----------------|----------|--------|-------|
-|      |      |            |       |                 |          |        |       |
-
-### Device Configuration Details
-
-#### \<Device Name\>
-- **Type:** *(e.g., Switch, Access Point, VPN Gateway, Proxy)*
-- **IP Address:**
-- **Model:**
-- **Firmware Version:**
-- **Location:**
-- **Configuration:**
-- **Notes:**
-
----
+## IP Address and Routing Summary
+- WAN/DMZ/Internet Networks: 100.0.0.0/24, 200.0.0.0/24
+- User VLANs: 10.1.0.0/24, 10.10.0.0/24, 10.20.0.0/24
+- Datacenter: 10.100.0.0/16 (PC /24)
 
 ## Change Log
-
-| Date | Changed By | Device | Description of Change |
-|------|-----------|--------|----------------------|
-|      |           |        |                      |
+- **2026-03-27** - Changed by lucaveiro: Added configurations to report.
