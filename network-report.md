@@ -104,10 +104,36 @@
 
 | Name | IP Address | Model | Firmware Version | Location | Routing Protocol | Status | Notes |
 |------|------------|-------|-----------------|----------|-----------------|--------|-------|
+| RouterFW3 | 10.1.0.3/24, 10.10.0.3/24, 10.20.0.3/24, 10.0.0.1/30, 10.0.0.5/30, 10.0.0.9/30 | (n/a) | (n/a) | (n/a) | OSPF (proc 1, area 0) | (n/a) | Inter-VLAN gateway; VLAN subinterfaces on eth0; VLAN interfaces are OSPF passive |
+| RouterFW4 | 10.1.0.4/24, 10.10.0.4/24, 10.20.0.4/24, 10.0.0.2/30, 10.0.0.13/30, 10.0.0.17/30 | (n/a) | (n/a) | (n/a) | OSPF (proc 1, area 0) | (n/a) | Inter-VLAN gateway (redundant); VLAN subinterfaces on eth0; VLAN interfaces are OSPF passive |
 | RouterC1 | 10.0.0.41/30, 10.0.0.45/30, 10.0.0.49/30, 10.0.0.34/30, 10.0.0.30/30, 10.0.0.14/30, 10.0.0.10/30 | (n/a) | (n/a) | (n/a) | OSPF (proc 1, area 0) | (n/a) | Core router with multiple /30 transit links |
 | RouterC2 | 10.0.0.57/30, 10.0.0.61/30, 10.0.0.50/30, 10.0.0.6/30, 10.0.0.18/30, 10.0.0.26/30, 10.0.0.38/30 | (n/a) | (n/a) | (n/a) | OSPF (proc 1, area 0) | (n/a) | Core router with multiple /30 transit links |
 
 ### Router Configuration Details
+
+#### RouterFW3
+- **Role:** Inter-VLAN gateway (VLAN 1/10/20) + OSPF router
+- **802.1Q VLANs/Subinterfaces on `eth0`:**
+  - `eth0.1` (VLAN 1) — `10.1.0.3/24`, OSPF area 0, **passive**
+  - `eth0.10` (VLAN 10) — `10.10.0.3/24`, OSPF area 0, **passive**
+  - `eth0.20` (VLAN 20) — `10.20.0.3/24`, OSPF area 0, **passive**
+- **Transit Interfaces:**
+  - `eth1` — `10.0.0.1/30`, OSPF area 0
+  - `eth2` — `10.0.0.5/30`, OSPF area 0
+  - `eth3` — `10.0.0.9/30`, OSPF area 0
+- **Routing:** OSPF process `1`, area `0`
+
+#### RouterFW4
+- **Role:** Redundant inter-VLAN gateway (VLAN 1/10/20) + OSPF router
+- **802.1Q VLANs/Subinterfaces on `eth0`:**
+  - `eth0.1` (VLAN 1) — `10.1.0.4/24`, OSPF area 0, **passive**
+  - `eth0.10` (VLAN 10) — `10.10.0.4/24`, OSPF area 0, **passive**
+  - `eth0.20` (VLAN 20) — `10.20.0.4/24`, OSPF area 0, **passive**
+- **Transit Interfaces:**
+  - `eth1` — `10.0.0.2/30`, OSPF area 0
+  - `eth2` — `10.0.0.13/30`, OSPF area 0
+  - `eth3` — `10.0.0.17/30`, OSPF area 0
+- **Routing:** OSPF process `1`, area `0`
 
 #### RouterC1
 - **Routing:** OSPF process `1`, area `0`
