@@ -11,7 +11,7 @@
 
 ## Firewalls
 
-| Name | IP Address | Model | Firmware Version | Location | Rules/Policies | Status | Notes |
+| Name | IP Address |  |  | Location | Rules/Policies |  | Notes |
 |------|------------|-------|-----------------|----------|----------------|--------|-------|
 | RouterFW1 | 100.0.0.1/24, 200.0.0.1/24, 10.0.0.53/30, 10.0.0.62/30, 10.0.0.42/30 | (n/a) | (n/a) | (n/a) | (n/a) | (n/a) | OSPF area 0 on eth1-eth4; originates default route always |
 | RouterFW2 | 100.0.0.2/24, 200.0.0.2/24, 10.0.0.54/30, 10.0.0.46/30, 10.0.0.58/30 | (n/a) | (n/a) | (n/a) | (n/a) | (n/a) | OSPF area 0 on eth1-eth4; originates default route always |
@@ -33,7 +33,7 @@
 - **Routing:**
   - OSPF process `1`, area `0`
   - `default-information originate always`
-- **Notes:** No explicit passive-interface configured in provided snippet.
+- **Notes:**
 
 #### RouterFW2
 - **Role:** Redundant edge FW/Router (Internet + DMZ + internal OSPF)
@@ -46,7 +46,7 @@
 - **Routing:**
   - OSPF process `1`, area `0`
   - `default-information originate always`
-- **Notes:** No explicit passive-interface configured in provided snippet.
+- **Notes:** 
 
 #### RouterFW3
 - **Role:** Inter-VLAN gateway (VLAN 1/10/20) + OSPF router
@@ -119,7 +119,7 @@
   - `eth4` — `10.0.0.30/30`, OSPF area 0
   - `eth5` — `10.0.0.14/30`, OSPF area 0
   - `eth6` — `10.0.0.10/30`, OSPF area 0
-- **Notes:** All listed interfaces participate in OSPF per provided config.
+- **Notes:** 
 
 #### RouterC2
 - **Routing:** OSPF process `1`, area `0`
@@ -131,21 +131,21 @@
   - `eth4` — `10.0.0.18/30`, OSPF area 0
   - `eth5` — `10.0.0.26/30`, OSPF area 0
   - `eth6` — `10.0.0.38/30`, OSPF area 0
-- **Notes:** All listed interfaces participate in OSPF per provided config.
+- **Notes:**
 
 ---
 
 ## Other Devices
 
-| Name | Type | IP Address | Model | Firmware Version | Location | Status | Notes |
+| Name | Type | IP Address | Location | Notes |
 |------|------|------------|-------|-----------------|----------|--------|-------|
-| L2-SW1 | Layer 2 Switch | (n/a) | (n/a) | (n/a) | (n/a) | (n/a) | VLANs 1/10/20 for access ports; dot1q trunks to FW3 and FW4 |
-| PC-VLAN1 | PC | 10.1.0.100/24 | (n/a) | (n/a) | (n/a) | (n/a) | Default via 10.1.0.3 (metric 10) then 10.1.0.4 (metric 20) |
-| PC-VLAN10 | PC | 10.10.0.100/24 | (n/a) | (n/a) | (n/a) | (n/a) | Default via 10.10.0.3 (metric 10) then 10.10.0.4 (metric 20) |
-| PC-VLAN20 | PC | 10.20.0.100/24 | (n/a) | (n/a) | (n/a) | (n/a) | Default via 10.20.0.3 (metric 10) then 10.20.0.4 (metric 20) |
-| PC-DC | PC | 10.100.0.100/24 | (n/a) | (n/a) | (n/a) | (n/a) | Default via 10.100.0.5 (metric 10) then 10.100.0.6 (metric 20) |
-| PC-DMZ | PC | 200.0.0.100/24 | (n/a) | (n/a) | (n/a) | (n/a) | Default via 200.0.0.1 (metric 10) then 200.0.0.2 (metric 20) |
-| PC-INET | PC | 100.0.0.100/24 | (n/a) | (n/a) | (n/a) | (n/a) | Default via 100.0.0.1 (metric 10) then 100.0.0.2 (metric 20) |
+| L2-SW1 | Layer 2 Switch |  | VLANs 1/10/20 for access ports; dot1q trunks to FW3 and FW4 |
+| PC-VLAN1 | PC | 10.1.0.100/24 |  | Default via 10.1.0.3 (metric 10) then 10.1.0.4 (metric 20) |
+| PC-VLAN10 | PC | 10.10.0.100/24 |  | Default via 10.10.0.3 (metric 10) then 10.10.0.4 (metric 20) |
+| PC-VLAN20 | PC | 10.20.0.100/24 |  | Default via 10.20.0.3 (metric 10) then 10.20.0.4 (metric 20) |
+| PC-DC | PC | 10.100.0.100/24 |  | Default via 10.100.0.5 (metric 10) then 10.100.0.6 (metric 20) |
+| PC-DMZ | PC | 200.0.0.100/24 |  | Default via 200.0.0.1 (metric 10) then 200.0.0.2 (metric 20) |
+| PC-INET | PC | 100.0.0.100/24 | | Default via 100.0.0.1 (metric 10) then 100.0.0.2 (metric 20) |
 
 ### Device Configuration Details
 
@@ -153,7 +153,7 @@
 - **VLANs:** 1, 10, 20
 - **Access ports:** configured for VLAN 1 / 10 / 20 (to test PCs)
 - **Trunk ports:** 802.1Q (dot1q) trunks to RouterFW3 and RouterFW4
-- **Notes:** No management IP was provided.
+- **Notes:**
 
 #### PCs
 - **PC (VLAN 1)**
@@ -188,9 +188,4 @@
     - via `100.0.0.2` metric 20
 
 ---
-
-## Change Log
-
-| Date | Changed By | Device | Description of Change |
-|------|-----------|--------|----------------------|
-| 2026-03-27 | lucaveiro | Multiple | Added RouterFW1–RouterFW6, RouterC1–RouterC2, L2 switch VLAN/trunk notes, and PC addressing/default routes (including OSPF + passive/default-originate details). |
+|
