@@ -31,7 +31,7 @@
   - eth2 `10.0.0.53/30` — OSPF area 0
   - eth3 `10.0.0.62/30` — OSPF area 0
   - eth4 `10.0.0.42/30` — OSPF area 0
-  - eth5 `10.0.0.89/30` — link to stateless-fw-lb-2 eth2, OSPF area 0 *(new adapter)*
+  - eth5 `10.0.0.89/30` — link to stateless-fw-lb-2 eth2, OSPF area 0
 - **Routing:** OSPF process 1, area 0. `default-information originate always`
 - **FRRouting running-config (final):**
 ```frr
@@ -62,7 +62,7 @@ interface eth5
 router ospf 1
  default-information originate always
 ```
-- **Notes:** conntrack disabled — required for stateless LB without FW synchronization. Verified ✅
+- **Notes:** conntrack disabled. Verified ✅
 
 ---
 
@@ -75,7 +75,7 @@ router ospf 1
   - eth2 `10.0.0.54/30` — OSPF area 0
   - eth3 `10.0.0.46/30` — OSPF area 0
   - eth4 `10.0.0.58/30` — OSPF area 0
-  - eth5 `10.0.0.85/30` — link to stateless-fw-lb-1 eth2, OSPF area 0 *(new adapter)*
+  - eth5 `10.0.0.85/30` — link to stateless-fw-lb-1 eth2, OSPF area 0
 - **Routing:** OSPF process 1, area 0. `default-information originate always`
 - **FRRouting running-config (final):**
 ```frr
@@ -106,7 +106,7 @@ interface eth5
 router ospf 1
  default-information originate always
 ```
-- **Notes:** conntrack disabled — required for stateless LB without FW synchronization. Verified ✅
+- **Notes:** conntrack disabled. Verified ✅
 
 ---
 
@@ -168,9 +168,9 @@ router ospf 1
 
 | Name | IP Address | Algorithm | Backend Pool | Notes |
 |------|-----------|-----------|-------------|-------|
-| stateless-fw-lb-1 | eth0 `100.0.0.7/24`, eth1 `10.0.0.70/30`, eth2 `10.0.0.86/30` | **HMARK** `src,sport` (OutsideLB) | RouterFW1, RouterFW2 | rp_filter=0 all ifaces. ip_forward=1. No conntrack. Policy routing fwmark 101→FW1, 102→FW2 |
-| stateless-fw-lb-2 | eth0 `100.0.0.8/24`, eth1 `10.0.0.74/30`, eth2 `10.0.0.90/30` | **HMARK** `src,sport` (OutsideLB) | RouterFW1, RouterFW2 | rp_filter=0 all ifaces. ip_forward=1. No conntrack. Policy routing fwmark 101→FW2, 102→FW1 |
-| lb-dmz | eth0 `10.0.0.78/30`, eth1 `200.0.0.254/24`, eth2 `10.0.0.82/30` | Stateless ECMP L4 hash | DMZ servers via Switch3 | OSPF active eth0/eth2, passive eth1. ip_forward=1 |
+| stateless-fw-lb-1 | eth0 `100.0.0.7/24`, eth1 `10.0.0.70/30`, eth2 `10.0.0.86/30` | HMARK `src,sport` (OutsideLB) | RouterFW1, RouterFW2 | rp_filter=0. ip_forward=1. NOTRACK. fwmark 101→FW1, 102→FW2 |
+| stateless-fw-lb-2 | eth0 `100.0.0.8/24`, eth1 `10.0.0.74/30`, eth2 `10.0.0.90/30` | HMARK `src,sport` (OutsideLB) | RouterFW1, RouterFW2 | rp_filter=0. ip_forward=1. NOTRACK. fwmark 101→FW2, 102→FW1 |
+| lb-dmz | eth0 `10.0.0.78/30`, eth1 `200.0.0.254/24`, eth2 `10.0.0.82/30` | Stateless gateway | DMZ server `200.0.0.100` | Single DMZ server. NOTRACK only. rp_filter=0. OSPF active eth0/eth2, passive eth1. TBD — pending discussion |
 
 ---
 
@@ -180,27 +180,60 @@ router ospf 1
 - **Interfaces:**
   - eth0 `100.0.0.7/24` — Internet Switch4, OSPF area 0, passive
   - eth1 `10.0.0.70/30` — link to RouterFW1 eth0, OSPF area 0
-  - eth2 `10.0.0.86/30` — link to RouterFW2 eth5, OSPF area 0 *(new adapter)*
-- **Load Balancing Method:** iptables HMARK on `src,sport` (OutsideLB). Hash computed over source IP + source port, mod 2. fwmark 101 → FW1 via eth1. fwmark 102 → FW2 via eth2. Same flow always hits the same FW — no firewall state synchronization required.
-- **Kernel config:**
+  - eth2 `10.0.0.86/30` — link to RouterFW2 eth5, OSPF area 0
+- **Load Balancing Method:** HMARK `src,sport`. fwmark 101 → FW1 via eth1. fwmark 102 → FW2 via eth2. Same flow always hits the same FW — no state synchronization required.
+
+- **`/etc/init.d/disable_reverse_path_validation`:**
 ```bash
-# ip_forward
-sysctl -w net.ipv4.ip_forward=1
+#!/bin/bash
+### BEGIN INIT INFO
+# Provides:          disable_reverse_path_validation
+# Required-Start:    $network
+# Required-Stop:
+# Default-Start:     2 3 4 5
+# Default-Stop:
+# Short-Description: Disable Reverse Path Validation (rp_filter)
+### END INIT INFO
 
-# rp_filter disabled (asymmetric paths)
-sysctl -w net.ipv4.conf.all.rp_filter=0
-sysctl -w net.ipv4.conf.default.rp_filter=0
-sysctl -w net.ipv4.conf.eth0.rp_filter=0
-sysctl -w net.ipv4.conf.eth1.rp_filter=0
-sysctl -w net.ipv4.conf.eth2.rp_filter=0
-
-# Persist
-echo "net.ipv4.conf.all.rp_filter=0"     >> /etc/sysctl.d/99-lb.conf
-echo "net.ipv4.conf.default.rp_filter=0" >> /etc/sysctl.d/99-lb.conf
+case "$1" in
+  start)
+    sysctl -w net.ipv4.conf.all.rp_filter=0
+    sysctl -w net.ipv4.conf.default.rp_filter=0
+    sysctl -w net.ipv4.conf.eth0.rp_filter=0
+    sysctl -w net.ipv4.conf.eth1.rp_filter=0
+    sysctl -w net.ipv4.conf.eth2.rp_filter=0
+    ;;
+  stop)
+    sysctl -w net.ipv4.conf.all.rp_filter=1
+    sysctl -w net.ipv4.conf.default.rp_filter=1
+    sysctl -w net.ipv4.conf.eth0.rp_filter=1
+    sysctl -w net.ipv4.conf.eth1.rp_filter=1
+    sysctl -w net.ipv4.conf.eth2.rp_filter=1
+    ;;
+  *)
+    echo "Usage: $0 {start|stop}"
+    exit 1
+    ;;
+esac
+exit 0
 ```
-- **HMARK + Policy Routing config:**
+
+- **Policy Routing:**
 ```bash
-# HMARK — OutsideLB hash by src,sport
+ip rule add fwmark 101 lookup 101
+ip rule add fwmark 102 lookup 102
+ip route add default via 10.0.0.69 dev eth1 table 101
+ip route add default via 10.0.0.85 dev eth2 table 102
+```
+
+- **`/etc/init.d/iptables.rules` (gerado via `iptables-save`):**
+```bash
+# Aplicar e depois guardar com: iptables-save > /etc/init.d/iptables.rules
+
+iptables -t raw -F
+iptables -t raw -A PREROUTING -j NOTRACK
+iptables -t raw -A OUTPUT -j NOTRACK
+
 iptables -t mangle -F
 iptables -t mangle -N LOADBALANCE
 iptables -t mangle -A LOADBALANCE -i eth0 \
@@ -210,12 +243,14 @@ iptables -t mangle -A LOADBALANCE -i eth0 \
   --hmark-offset 101
 iptables -t mangle -A PREROUTING -j LOADBALANCE
 
-# Policy routing tables
-ip rule add fwmark 101 lookup 101
-ip rule add fwmark 102 lookup 102
-ip route add default via 10.0.0.69 dev eth1 table 101  # fwmark 101 → FW1
-ip route add default via 10.0.0.85 dev eth2 table 102  # fwmark 102 → FW2
+iptables-save > /etc/init.d/iptables.rules
 ```
+
+- **Restaurar no boot:**
+```bash
+iptables-restore < /etc/init.d/iptables.rules
+```
+
 - **FRRouting running-config (final):**
 ```frr
 interface eth0
@@ -234,14 +269,4 @@ interface eth2
 router ospf 1
  network 100.0.0.0/24 area 0
 ```
-- **Notes:** No nftables. No conntrack. No session table. `100.0.0.0/24` announced via OSPF `network` statement so RouterC1/C2 learn the return path. Verified ✅
-
----
-
-### Load Balancer Configuration Details — stateless-fw-lb-2
-
-- **Role:** Hash Function based stateless LB (OutsideLB). Internet → Switch4 → RouterFW1 or RouterFW2. No FW state synchronization.
-- **Interfaces:**
-  - eth0 `100.0.0.8/24` — Internet Switch4, OSPF area 0, passive
-  - eth1 `10.0.0.74/30` — link to RouterFW2 eth0, OSPF area 0
-  - eth2 `10.0.0.90/30` — link to RouterFW1 eth5, OSPF area 0 *(new adapter)*
+- **Notes:** No nftables.
