@@ -25,14 +25,16 @@ The internal transit network (`10.0.0.0/16`) is the OSPF core backbone, not a zo
 ## Policy #1: DDoS Protection from Internet
 
 **Devices Involved:**
-- **stateless-fw-lb-1** — eth0 `100.0.0.7/24` ← Internet, eth1 `10.0.0.70/30` → FW1
-- **stateless-fw-lb-2** — eth0 `100.0.0.8/24` ← Internet, eth1 `10.0.0.74/30` → FW2
-- **RouterFW1** — eth0 `10.0.0.69/30` ← LB1
-- **RouterFW2** — eth0 `10.0.0.73/30` ← LB2
+- **stateless-fw-lb-1** — eth0 `100.0.0.7/24` ← Internet, eth1 `10.0.0.70/30` → FW1, eth2 `10.0.0.86/30` → FW2 (backup)
+- **stateless-fw-lb-2** — eth0 `100.0.0.8/24` ← Internet, eth1 `10.0.0.74/30` → FW2, eth2 `10.0.0.90/30` → FW1 (backup)
+- **RouterFW1** — eth0 `10.0.0.69/30` ← LB1, eth5 `10.0.0.85/30` ← LB2
+- **RouterFW2** — eth0 `10.0.0.73/30` ← LB2, eth5 `10.0.0.89/30` ← LB1
 
-**Traffic Flow:** Internet → Load Balancers (HMARK hash distribution) → Edge Firewalls → Internal
+**Traffic Flow:** Internet → Load Balancers (HMARK hash on src-IP+sport, mod 2) → Edge Firewalls → Internal
 
-**Chains:** `ANTI-SPOOFING`, `SYN-FLOOD`
+**LB Chains (mangle table):** `ANTI-SPOOFING`, `SYN-FLOOD`, `ICMP-FLOOD`, `LOADBALANCE`
+
+**FW1/FW2 Chains (filter table):** `ANTI-SPOOFING`, `DDOS-BLACKLIST`
 
 ---
 
@@ -41,7 +43,7 @@ The internal transit network (`10.0.0.0/16`) is the OSPF core backbone, not a zo
 **Devices Involved:**
 - **RouterFW3/FW4** — VLAN gateways: eth0.1, eth0.10, eth0.20
 - **RouterC1/C2** — OSPF core routing
-- **RouterFW1/FW2** — Edge firewalls: eth2-5 ← Core, eth0 → Internet
+- **RouterFW1/FW2** — Edge firewalls: eth2-4 ← Core, eth0/eth5 → Internet (via LBs)
 
 **Traffic Flow:** VLANs → FW3/FW4 → Core Routers → FW1/FW2 (filter ports) → Internet
 
@@ -102,12 +104,13 @@ Both paths → **lb-dmz** → DMZ servers
 - **RouterC1/C2** — core
 - **RouterFW5/FW6** — datacenter firewalls with **critical rule ordering**
 
-**Rule Order (CRITICAL):**
-1. **SPECIFIC:** ALLOW VLAN20 → DB (port 3306)
-2. **EXPLICIT:** BLOCK VLAN10 → DB (port 3306)
-3. **GENERIC:** ALLOW VLAN10/20 → Intranet/DNS (Policy #5)
+**Rule Order (CRITICAL) in ZONE-DATACENTER:**
+1. `MGMT-ACCESS` — management host (highest priority)
+2–4. `FROM-VLAN20-TO-DATABASE` — ALLOW VLAN20 → DB (port 3306), one rule per Core interface (eth1/2/3)
+5. Explicit DROP VLAN10 → port 3306
+6+. `FROM-VLAN10-20-TO-DC` — GENERIC ALLOW VLAN10/20 → Intranet/DNS (Policy #5)
 
-**Chain:** `FROM-VLAN20-TO-DATABASE` (position 1)
+**Chain:** `FROM-VLAN20-TO-DATABASE` (position 2, after MGMT-ACCESS)
 
 ---
 
@@ -148,8 +151,8 @@ Both paths → **lb-dmz** → DMZ servers
 
 | Policy | Source | Destination | Firewalls | Key Interfaces | Chains |
 |--------|--------|-------------|-----------|----------------|--------|
-| **#1 DDoS** | Internet | All | LB1/2, FW1/2 | **LB:** eth0 ← Internet, eth1 → FW<br>**FW:** eth0 ← LB | `ANTI-SPOOFING`, `SYN-FLOOD` |
-| **#2 HTTP/S** | VLANs | Internet | FW3/4, FW1/2 | **FW3/4:** eth0.* ← VLANs, eth1-3 → Core<br>**FW1/2:** eth2-5 ← Core, eth0 → Internet | `FROM-CORE-TO-INTERNET` |
+| **#1 DDoS** | Internet | All | LB1/2, FW1/2 | **LB:** eth0 ← Internet, eth1 → primary FW, eth2 → backup FW<br>**FW:** eth0 ← LB1, eth5 ← LB2 | **LB (mangle):** `ANTI-SPOOFING`, `SYN-FLOOD`, `ICMP-FLOOD`, `LOADBALANCE`<br>**FW (filter):** `ANTI-SPOOFING`, `DDOS-BLACKLIST` |
+| **#2 HTTP/S** | VLANs | Internet | FW3/4, FW1/2 | **FW3/4:** eth0.* ← VLANs, eth1-3 → Core<br>**FW1/2:** eth2-4 ← Core, eth0/eth5 → Internet | `FROM-CORE-TO-INTERNET` |
 | **#3 VoIP** | VLAN10 | VoIP IPs | FW3/4 | **FW3/4:** eth0.10 ← VLAN10, eth1-3 → Core | `FROM-VLAN10-TO-VOIP` |
 | **#4a DMZ** | Internet | DMZ | FW1/2 | **FW1/2:** eth0 ← Internet, eth1 → DMZ | `FROM-INTERNET-TO-DMZ` |
 | **#4b DMZ** | VLANs | DMZ | FW3/4 | **FW3/4:** eth0.* ← VLANs, eth1-3 → Core | `FROM-INTERNAL-TO-DMZ` |
