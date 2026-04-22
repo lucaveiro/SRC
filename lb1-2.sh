@@ -107,6 +107,11 @@ iptables -t mangle -A LOADBALANCE -i eth0 \
 
 iptables -t mangle -A PREROUTING -j LOADBALANCE
 
+iptables -t raw -A PREROUTING -i eth0 -j NOTRACK
+iptables -t raw -A PREROUTING -i eth1 -j NOTRACK
+iptables -t raw -A PREROUTING -i eth2 -j NOTRACK
+iptables -t raw -A OUTPUT -j NOTRACK
+
 # ============================================================================
 # Policy Routing Tables (for stateless-fw-lb-1)
 # ============================================================================

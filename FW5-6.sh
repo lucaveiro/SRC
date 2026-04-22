@@ -28,6 +28,15 @@ iptables -A FORWARD -o eth1 -j ZONE-CORE
 iptables -A FORWARD -o eth2 -j ZONE-CORE
 iptables -A FORWARD -o eth3 -j ZONE-CORE
 
+# Allow OSPF (required for neighbor adjacency)
+iptables -A INPUT -p ospf -j ACCEPT
+
+# Allow ICMP (ping to router interfaces)
+iptables -A INPUT -p icmp -j ACCEPT
+
+# Allow ESTABLISHED/RELATED return traffic
+iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+
 # ============================================================================
 # POLICY #7: Management Access (HIGHEST PRIORITY - Position 1)
 # ============================================================================

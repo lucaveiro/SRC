@@ -18,8 +18,17 @@ iptables -P OUTPUT ACCEPT
 
 # ============================================================================
 # Allow loopback
-# ============================================================================
 iptables -A INPUT -i lo -j ACCEPT
+
+# Allow OSPF (required for neighbor adjacency)
+iptables -A INPUT -p ospf -j ACCEPT
+iptables -A OUTPUT -p ospf -j ACCEPT
+
+# Allow ICMP (ping to router interfaces)
+iptables -A INPUT -p icmp -j ACCEPT
+
+# Allow ESTABLISHED/RELATED return traffic
+iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
 
 # ============================================================================
 # POLICY #1: DDoS Protection
