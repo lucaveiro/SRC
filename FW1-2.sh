@@ -177,7 +177,7 @@ iptables -A ZONE-CORE -i eth4 -j ACCEPT  # from C2/C1
 # ============================================================================
 # Save rules
 # ============================================================================
-iptables-save > /etc/iptables/rules.v4
+iptables-save > /etc/init.d/iptables.rules
 
 echo "RouterFW1/FW2 firewall configuration complete!"
 echo "Policies implemented: #1 (DDoS), #2 (Internet), #4a (Internet→DMZ), #7 (Management)"
