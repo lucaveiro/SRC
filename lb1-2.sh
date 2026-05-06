@@ -64,13 +64,13 @@ iptables -t mangle -A ANTIDDOS -p tcp --tcp-flags FIN,SYN,RST,PSH,ACK,URG FIN,SY
 # --- ICMP rate limit ---
 iptables -t mangle -A ANTIDDOS -p icmp \
   -m hashlimit --hashlimit-upto 10/sec --hashlimit-burst 20 \
-  --hashlimit-mode srcip --hashlimit-name icmp_limit -j ACCEPT
+  --hashlimit-mode srcip --hashlimit-name icmp_limit -j DROP
 iptables -t mangle -A ANTIDDOS -p icmp -j DROP
 
 # --- General per-srcip rate limit (DDoS) ---
 iptables -t mangle -A ANTIDDOS \
   -m hashlimit --hashlimit-upto 1000/sec --hashlimit-burst 2000 \
-  --hashlimit-mode srcip --hashlimit-name ddos_limit -j ACCEPT
+  --hashlimit-mode srcip --hashlimit-name ddos_limit -j DROP
 iptables -t mangle -A ANTIDDOS -j DROP
 
 # ============================================================================
@@ -86,7 +86,7 @@ iptables -t mangle -A LOADBALANCE -i eth0 \
 # ============================================================================
 # Attach to PREROUTING
 # ============================================================================
-iptables -t mangle -A PREROUTING -j ANTIDDOS
+iptables -t mangle -A PREROUTING -i eth0 -j ANTIDDOS
 iptables -t mangle -A PREROUTING -j LOADBALANCE
 
 # ============================================================================
@@ -100,8 +100,8 @@ ip route add default via 10.0.0.69 dev eth1 table 101  # fwmark 101 → RouterFW
 ip route add default via 10.0.0.85 dev eth2 table 102  # fwmark 102 → RouterFW2
 
 # FOR stateless-fw-lb-2, use instead:
-# ip route add default via 10.0.0.73 dev eth1 table 101  # fwmark 101 → RouterFW2
-# ip route add default via 10.0.0.89 dev eth2 table 102  # fwmark 102 → RouterFW1
+#ip route add default via 10.0.0.73 dev eth1 table 101  # fwmark 101 → RouterFW2
+#ip route add default via 10.0.0.89 dev eth2 table 102  # fwmark 102 → RouterFW1
 
 # ============================================================================
 # Save rules

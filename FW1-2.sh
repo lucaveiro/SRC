@@ -59,12 +59,6 @@ iptables -A ANTI-SPOOFING -s 240.0.0.0/4    -j DROP
 iptables -A FORWARD -i eth0 -j ANTI-SPOOFING
 iptables -A FORWARD -i eth5 -j ANTI-SPOOFING
 
-# DDoS Blacklist (updated dynamically by monitoring system)
-iptables -N DDOS-BLACKLIST
-# Dynamic script will add: iptables -I DDOS-BLACKLIST -s <attacker_ip> -j DROP
-iptables -A FORWARD -i eth0 -j DDOS-BLACKLIST
-iptables -A FORWARD -i eth5 -j DDOS-BLACKLIST
-
 # SYN flood rate limiting (connlimit now valid since conntrack is enabled)
 iptables -A FORWARD -p tcp --syn -m connlimit --connlimit-above 50 --connlimit-mask 32 -j DROP
 iptables -A FORWARD -p tcp --syn -m limit --limit 20/s --limit-burst 40 -j ACCEPT
