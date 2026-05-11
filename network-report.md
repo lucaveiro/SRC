@@ -1,11 +1,10 @@
 # Network Infrastructure Report
 
+**Authors:** Ruben Lopes (nmec: 103009), Lucas Rebelo (nmec: 123934)
+
 ## Table of Contents
 - [Firewalls](#firewalls)
 - [Load Balancers](#load-balancers)
-- [Routers](#routers)
-- [Other Devices](#other-devices)
-- [Change Log](#change-log)
 
 > **See also:** [Network Security Policies](policies.md) — per-policy breakdown of traffic flows, devices, interfaces, and iptables chains.
 
@@ -35,36 +34,7 @@
   - eth4 `10.0.0.42/30` — OSPF area 0
   - eth5 `10.0.0.89/30` — link to stateless-fw-lb-2 eth2, OSPF area 0
 - **Routing:** OSPF process 1, area 0. `default-information originate always`
-- **FRRouting running-config (final):**
-```frr
-interface eth0
- ip address 10.0.0.69/30
- ip ospf 1 area 0
-!
-interface eth1
- ip address 10.0.0.81/30
- ip ospf 1 area 0
-!
-interface eth2
- ip address 10.0.0.53/30
- ip ospf 1 area 0
-!
-interface eth3
- ip address 10.0.0.62/30
- ip ospf 1 area 0
-!
-interface eth4
- ip address 10.0.0.42/30
- ip ospf 1 area 0
-!
-interface eth5
- ip address 10.0.0.89/30
- ip ospf 1 area 0
-!
-router ospf 1
- default-information originate always
-```
-- **Notes:** conntrack disabled. Verified ✅
+- **Notes:** conntrack enabled (STATEFUL).
 
 ---
 
@@ -79,36 +49,7 @@ router ospf 1
   - eth4 `10.0.0.58/30` — OSPF area 0
   - eth5 `10.0.0.85/30` — link to stateless-fw-lb-1 eth2, OSPF area 0
 - **Routing:** OSPF process 1, area 0. `default-information originate always`
-- **FRRouting running-config (final):**
-```frr
-interface eth0
- ip address 10.0.0.73/30
- ip ospf 1 area 0
-!
-interface eth1
- ip address 10.0.0.77/30
- ip ospf 1 area 0
-!
-interface eth2
- ip address 10.0.0.54/30
- ip ospf 1 area 0
-!
-interface eth3
- ip address 10.0.0.46/30
- ip ospf 1 area 0
-!
-interface eth4
- ip address 10.0.0.58/30
- ip ospf 1 area 0
-!
-interface eth5
- ip address 10.0.0.85/30
- ip ospf 1 area 0
-!
-router ospf 1
- default-information originate always
-```
-- **Notes:** conntrack disabled. Verified ✅
+- **Notes:** conntrack enabled (STATEFUL).
 
 ---
 
@@ -183,92 +124,58 @@ router ospf 1
   - eth0 `100.0.0.7/24` — Internet Switch4, OSPF area 0, passive
   - eth1 `10.0.0.70/30` — link to RouterFW1 eth0, OSPF area 0
   - eth2 `10.0.0.86/30` — link to RouterFW2 eth5, OSPF area 0
-- **Load Balancing Method:** HMARK `src,sport`. fwmark 101 → FW1 via eth1. fwmark 102 → FW2 via eth2. Same flow always hits the same FW — no state synchronization required.
-
-- **`/etc/init.d/disable_reverse_path_validation`:**
-```bash
-#!/bin/bash
-### BEGIN INIT INFO
-# Provides:          disable_reverse_path_validation
-# Required-Start:    $network
-# Required-Stop:
-# Default-Start:     2 3 4 5
-# Default-Stop:
-# Short-Description: Disable Reverse Path Validation (rp_filter)
-### END INIT INFO
-
-case "$1" in
-  start)
-    sysctl -w net.ipv4.conf.all.rp_filter=0
-    sysctl -w net.ipv4.conf.default.rp_filter=0
-    sysctl -w net.ipv4.conf.eth0.rp_filter=0
-    sysctl -w net.ipv4.conf.eth1.rp_filter=0
-    sysctl -w net.ipv4.conf.eth2.rp_filter=0
-    ;;
-  stop)
-    sysctl -w net.ipv4.conf.all.rp_filter=1
-    sysctl -w net.ipv4.conf.default.rp_filter=1
-    sysctl -w net.ipv4.conf.eth0.rp_filter=1
-    sysctl -w net.ipv4.conf.eth1.rp_filter=1
-    sysctl -w net.ipv4.conf.eth2.rp_filter=1
-    ;;
-  *)
-    echo "Usage: $0 {start|stop}"
-    exit 1
-    ;;
-esac
-exit 0
-```
+- **Load Balancing Method:** HMARK `src,sport`. fwmark 101 → FW1 via eth1. fwmark 102 → FW2 via eth2. Same flow always hits the same FW — no state synchronization.
 
 - **Policy Routing:**
 ```bash
 ip rule add fwmark 101 lookup 101
 ip rule add fwmark 102 lookup 102
-ip route add default via 10.0.0.69 dev eth1 table 101
-ip route add default via 10.0.0.85 dev eth2 table 102
+# stateless-fw-lb-1:
+ip route add default via 10.0.0.69 dev eth1 table 101  # fwmark 101 → RouterFW1
+ip route add default via 10.0.0.85 dev eth2 table 102  # fwmark 102 → RouterFW2
+# stateless-fw-lb-2 (swap FW1/FW2):
+# ip route add default via 10.0.0.73 dev eth1 table 101  # fwmark 101 → RouterFW2
+# ip route add default via 10.0.0.89 dev eth2 table 102  # fwmark 102 → RouterFW1
 ```
 
-- **`/etc/init.d/iptables.rules` (gerado via `iptables-save`):**
+- **iptables rules (mangle table — DDoS + LB):**
 ```bash
-# Aplicar e depois guardar com: iptables-save > /etc/init.d/iptables.rules
-
-iptables -t raw -F
+# NOTRACK (stateless)
 iptables -t raw -A PREROUTING -j NOTRACK
 iptables -t raw -A OUTPUT -j NOTRACK
 
-iptables -t mangle -F
+# ANTIDDOS chain: anti-spoofing, invalid TCP flags, ICMP rate limit, per-srcip rate limit
+iptables -t mangle -N ANTIDDOS
+iptables -t mangle -A ANTIDDOS -i eth0 -s 10.0.0.0/8 -j DROP
+iptables -t mangle -A ANTIDDOS -i eth0 -s 172.16.0.0/12 -j DROP
+iptables -t mangle -A ANTIDDOS -i eth0 -s 192.168.0.0/16 -j DROP
+iptables -t mangle -A ANTIDDOS -i eth0 -s 127.0.0.0/8 -j DROP
+iptables -t mangle -A ANTIDDOS -i eth0 -s 0.0.0.0/8 -j DROP
+iptables -t mangle -A ANTIDDOS -i eth0 -s 169.254.0.0/16 -j DROP
+iptables -t mangle -A ANTIDDOS -i eth0 -s 224.0.0.0/4 -j DROP
+iptables -t mangle -A ANTIDDOS -i eth0 -s 240.0.0.0/4 -j DROP
+iptables -t mangle -A ANTIDDOS -p tcp --tcp-flags FIN,SYN FIN,SYN -j DROP
+iptables -t mangle -A ANTIDDOS -p tcp --tcp-flags SYN,RST SYN,RST -j DROP
+iptables -t mangle -A ANTIDDOS -p tcp --tcp-flags FIN,RST FIN,RST -j DROP
+iptables -t mangle -A ANTIDDOS -p tcp --tcp-flags FIN,ACK FIN -j DROP
+iptables -t mangle -A ANTIDDOS -p tcp --tcp-flags ACK,URG URG -j DROP
+iptables -t mangle -A ANTIDDOS -p tcp --tcp-flags FIN,SYN,RST,PSH,ACK,URG NONE -j DROP
+iptables -t mangle -A ANTIDDOS -p tcp --tcp-flags FIN,SYN,RST,PSH,ACK,URG FIN,SYN,RST,PSH,ACK,URG -j DROP
+iptables -t mangle -A ANTIDDOS -p icmp \
+  -m hashlimit --hashlimit-upto 10/sec --hashlimit-burst 20 \
+  --hashlimit-mode srcip --hashlimit-name icmp_limit -j DROP
+iptables -t mangle -A ANTIDDOS -p icmp -j DROP
+iptables -t mangle -A ANTIDDOS \
+  -m hashlimit --hashlimit-upto 1000/sec --hashlimit-burst 2000 \
+  --hashlimit-mode srcip --hashlimit-name ddos_limit -j DROP
+iptables -t mangle -A ANTIDDOS -j DROP
+
+# LOADBALANCE chain: HMARK hash on src+sport, mod 2, offset 101
 iptables -t mangle -N LOADBALANCE
 iptables -t mangle -A LOADBALANCE -i eth0 \
   -j HMARK --hmark-rnd 1 \
   --hmark-tuple src,sport \
   --hmark-mod 2 \
   --hmark-offset 101
-iptables -t mangle -A PREROUTING -j LOADBALANCE
 
-iptables-save > /etc/init.d/iptables.rules
 ```
-
-- **Restaurar no boot:**
-```bash
-iptables-restore < /etc/init.d/iptables.rules
-```
-
-- **FRRouting running-config (final):**
-```frr
-interface eth0
- ip address 100.0.0.7/24
- ip ospf 1 area 0
- ip ospf passive
-!
-interface eth1
- ip address 10.0.0.70/30
- ip ospf 1 area 0
-!
-interface eth2
- ip address 10.0.0.86/30
- ip ospf 1 area 0
-!
-router ospf 1
- network 100.0.0.0/24 area 0
-```
-- **Notes:** No nftables.
