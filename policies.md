@@ -1,5 +1,7 @@
 # Network Security Policies
 
+**Authors:** Ruben Lopes (nmec: 103009), Lucas Rebelo (nmec: 123934)
+
 Detailed breakdown of each security policy with devices, interfaces, traffic flow, and iptables chains.
 
 ---
@@ -10,12 +12,14 @@ Detailed breakdown of each security policy with devices, interfaces, traffic flo
 |------|---------|-------------------|
 | **Internet** | — (external) | RouterFW1 / RouterFW2 (eth0) |
 | **DMZ** | `200.0.0.0/24` | RouterFW1 / RouterFW2 (eth1) via lb-dmz |
+| **Core** | `10.0.0.0/16` (transit) | RouterFW1/FW2 (eth2-4), RouterFW3/FW4 (eth1-3), RouterFW5/FW6 (eth1-3) |
 | **VLAN1** (Building A — Management) | `10.1.0.0/24` | RouterFW3 / RouterFW4 (eth0.1) |
 | **VLAN10** (Building A) | `10.10.0.0/24` | RouterFW3 / RouterFW4 (eth0.10) |
 | **VLAN20** (Building A) | `10.20.0.0/24` | RouterFW3 / RouterFW4 (eth0.20) |
 | **Datacenter** | `10.100.0.0/16` | RouterFW5 / RouterFW6 (eth0) |
 
-The internal transit network (`10.0.0.0/16`) is the OSPF core backbone, not a zone. Enforcement points:
+The Core zone is the OSPF backbone (`10.0.0.0/16`). It is a transit zone — no services are hosted there — but it is enforced via `ZONE-CORE` chains on all firewalls. Return traffic into the core is handled by `TO-CORE` (ESTABLISHED/RELATED) on FW1/FW2 and FW5/FW6. Enforcement points:
+
 - **FW1/FW2** — Internet ↔ DMZ, Internet ↔ Core
 - **FW3/FW4** — VLAN1/10/20 ↔ Core (inter-VLAN and outbound)
 - **FW5/FW6** — Core ↔ Datacenter
@@ -32,9 +36,9 @@ The internal transit network (`10.0.0.0/16`) is the OSPF core backbone, not a zo
 
 **Traffic Flow:** Internet → Load Balancers (HMARK hash on src-IP+sport, mod 2) → Edge Firewalls → Internal
 
-**LB Chains (mangle table):** `ANTI-SPOOFING`, `SYN-FLOOD`, `ICMP-FLOOD`, `LOADBALANCE`
+**LB Chains (mangle table):** `ANTIDDOS` (anti-spoofing + invalid TCP flags + ICMP rate limit + per-srcip rate limit), `LOADBALANCE`
 
-**FW1/FW2 Chains (filter table):** `ANTI-SPOOFING`, `DDOS-BLACKLIST`
+**FW1/FW2 Chains (filter table):** `ANTI-SPOOFING`
 
 ---
 
@@ -56,7 +60,7 @@ The internal transit network (`10.0.0.0/16`) is the OSPF core backbone, not a zo
 **Devices Involved:**
 - **VLAN10 users** — `10.10.0.0/24`
 - **RouterFW3/FW4** — eth0.10 ← VLAN10, eth1-3 → Core
-- **VoIP Servers** — `100.64.0.10`, `100.64.0.11`
+- **VoIP Servers** — `200.0.0.10`
 
 **Traffic Flow:** VLAN10 → FW3/FW4 (check whitelist) → Specific VoIP servers only
 
@@ -91,7 +95,7 @@ Both paths → **lb-dmz** → DMZ servers
 
 **Traffic Flow:** VLAN10/20 → FW3/FW4 → Core → FW5/FW6 (filter by source VLAN + service) → Datacenter
 
-**Chain:** `FROM-VLAN10-20-TO-DC`
+**Chain:** `FROM-VLAN-TO-DC` (FW3/FW4), `FROM-VLAN10-20-TO-DC` (FW5/FW6)
 
 ---
 
@@ -104,7 +108,8 @@ Both paths → **lb-dmz** → DMZ servers
 - **RouterC1/C2** — core
 - **RouterFW5/FW6** — datacenter firewalls with **critical rule ordering**
 
-**Rule Order (CRITICAL) in ZONE-DATACENTER:**
+**Rule Order in ZONE-DATACENTER:**
+
 1. `MGMT-ACCESS` — management host (highest priority)
 2–4. `FROM-VLAN20-TO-DATABASE` — ALLOW VLAN20 → DB (port 3306), one rule per Core interface (eth1/2/3)
 5. Explicit DROP VLAN10 → port 3306
@@ -151,12 +156,12 @@ Both paths → **lb-dmz** → DMZ servers
 
 | Policy | Source | Destination | Firewalls | Key Interfaces | Chains |
 |--------|--------|-------------|-----------|----------------|--------|
-| **#1 DDoS** | Internet | All | LB1/2, FW1/2 | **LB:** eth0 ← Internet, eth1 → primary FW, eth2 → backup FW<br>**FW:** eth0 ← LB1, eth5 ← LB2 | **LB (mangle):** `ANTI-SPOOFING`, `SYN-FLOOD`, `ICMP-FLOOD`, `LOADBALANCE`<br>**FW (filter):** `ANTI-SPOOFING`, `DDOS-BLACKLIST` |
+| **#1 DDoS** | Internet | All | LB1/2, FW1/2 | **LB:** eth0 ← Internet, eth1 → primary FW, eth2 → backup FW<br>**FW:** eth0 ← LB1, eth5 ← LB2 | **LB (mangle):** `ANTIDDOS`, `LOADBALANCE`<br>**FW (filter):** `ANTI-SPOOFING` |
 | **#2 HTTP/S** | VLANs | Internet | FW3/4, FW1/2 | **FW3/4:** eth0.* ← VLANs, eth1-3 → Core<br>**FW1/2:** eth2-4 ← Core, eth0/eth5 → Internet | `FROM-CORE-TO-INTERNET` |
 | **#3 VoIP** | VLAN10 | VoIP IPs | FW3/4 | **FW3/4:** eth0.10 ← VLAN10, eth1-3 → Core | `FROM-VLAN10-TO-VOIP` |
 | **#4a DMZ** | Internet | DMZ | FW1/2 | **FW1/2:** eth0 ← Internet, eth1 → DMZ | `FROM-INTERNET-TO-DMZ` |
 | **#4b DMZ** | VLANs | DMZ | FW3/4 | **FW3/4:** eth0.* ← VLANs, eth1-3 → Core | `FROM-INTERNAL-TO-DMZ` |
-| **#5 DC** | VLAN10/20 | Datacenter | FW5/6 | **FW5/6:** eth1-3 ← Core, eth0 → DC | `FROM-VLAN10-20-TO-DC` |
+| **#5 DC** | VLAN10/20 | Datacenter | FW3/4, FW5/6 | **FW3/4:** eth0.10/20 ← VLANs, eth1-3 → Core<br>**FW5/6:** eth1-3 ← Core, eth0 → DC | `FROM-VLAN-TO-DC` (FW3/4), `FROM-VLAN10-20-TO-DC` (FW5/6) |
 | **#6 DB** | VLAN20 | Datacenter | FW5/6 | **FW5/6:** eth1-3 ← Core, eth0 → DC | `FROM-VLAN20-TO-DATABASE` (pos 1) |
 | **#7 Mgmt** | VLAN1 host | All | ALL FW | All zones | `MGMT-ACCESS` (pos 1) |
 | **#8 Samba** | VLAN10 ↔ 20 | VLAN20 ↔ 10 | FW3/4 | **FW3/4:** eth0.10, eth0.20 | `FROM-VLAN10-TO-VLAN20`<br>`FROM-VLAN20-TO-VLAN10` |
